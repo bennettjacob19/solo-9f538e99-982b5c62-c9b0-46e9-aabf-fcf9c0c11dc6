@@ -1,0 +1,1 @@
+"""Embedding batch gateway package."""

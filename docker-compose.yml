@@ -1,0 +1,55 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: embedding-mock-backend:latest
+    environment:
+      MOCK_DELAY_MS: "${MOCK_DELAY_MS:-300}"
+      MOCK_ERROR_RATE: "${MOCK_ERROR_RATE:-0.0}"
+      MOCK_ERROR_STATUS: "${MOCK_ERROR_STATUS:-503}"
+      MOCK_MODE: "${MOCK_MODE:-ok}"
+      MOCK_SHUFFLE_RESPONSE: "${MOCK_SHUFFLE_RESPONSE:-false}"
+      MOCK_MAX_INPUTS: "${MOCK_MAX_INPUTS:-8}"
+      MOCK_DIM: "${MOCK_DIM:-8}"
+    ports:
+      - "${BACKEND_PORT:-9000}:9000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/healthz', timeout=2)"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 2s
+
+  gateway:
+    build:
+      context: ./gateway
+    image: embedding-batch-gateway:latest
+    environment:
+      EMBEDDING_BACKEND_URL: "http://backend:9000/v1/embeddings"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-local-demo}"
+      EMBEDDING_BACKEND_TIMEOUT_SECONDS: "${EMBEDDING_BACKEND_TIMEOUT_SECONDS:-30}"
+      GATEWAY_BATCH_WINDOW_MS: "${GATEWAY_BATCH_WINDOW_MS:-20}"
+      GATEWAY_MAX_TEXTS_PER_REQUEST: "${GATEWAY_MAX_TEXTS_PER_REQUEST:-4}"
+      GATEWAY_MAX_TEXTS_PER_BATCH: "${GATEWAY_MAX_TEXTS_PER_BATCH:-8}"
+      GATEWAY_DEFAULT_TIMEOUT_MS: "${GATEWAY_DEFAULT_TIMEOUT_MS:-5000}"
+      GATEWAY_MAX_TIMEOUT_MS: "${GATEWAY_MAX_TIMEOUT_MS:-600000}"
+      GATEWAY_DISCONNECT_POLL_INTERVAL_MS: "${GATEWAY_DISCONNECT_POLL_INTERVAL_MS:-20}"
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
